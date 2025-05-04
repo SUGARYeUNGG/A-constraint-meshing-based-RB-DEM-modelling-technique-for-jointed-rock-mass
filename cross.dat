@@ -1,0 +1,108 @@
+model new
+
+model restore 'initial'
+
+fish define para
+    pb_ten = 7e+08
+    pb_coh = 9.1e+08
+    emod = 4e10
+    pb_fa = 20
+    kratio = 1.2
+    fric = 0.1
+    dp_nratio = 0.01
+    dp_sratio = 0.01
+    i = 0.01
+end
+
+[para]
+
+contact cmat default type 'rblock-facet' model linear ...
+        method deformability    emod [emod] krat [kratio] ...
+        property  fric [fric] dp_nratio 0.5
+contact cmat default type 'rblock-rblock' model linearpbond ...
+                   method deformability    emod [emod] krat [kratio]  ...
+                   pb_deformability emod [emod] krat [kratio]         ...
+                   property fric [fric] dp_nratio [dp_nratio] dp_sratio [dp_sratio]  ...
+                   pb_ten [pb_ten] pb_coh [pb_coh] pb_fa [pb_fa] lin_mode 1   
+contact cmat apply
+model clean all
+contact method bond gap 0
+contact inhibit range contact gap 0 100
+;
+
+fish define setup
+    global a_size = 2000
+    global IO_READ  = 0
+    global IO_WRITE = 1
+    global IO_FISH  = 0
+    global IO_ASCII = 1
+    global filename = 'CrackPairFile.dat'
+end
+@setup
+
+fish define search_contact
+    global lin_num
+    array bb(a_size)
+    status = file.open(filename, IO_READ, IO_ASCII)
+    status = file.read(bb, a_size);�������м�¼��bb��
+    lin_num=status
+    var = array.create(status,2);�½�n��2������
+    loop local m (1,array.size(var,1));�����н���ѭ��
+        loop local n (1,array.size(var,2))
+            var(m,n)=string.token(bb(m),n);
+        endloop
+        loop foreach local c contact.list()
+            c1=math.min(contact.end1(c),contact.end2(c))    ; ����
+            c2=math.max(contact.end1(c),contact.end2(c))
+            c1_id=rblock.id(c1)
+            c2_id=rblock.id(c2)
+            if c1_id == var(m,1) & c2_id == var(m,2) then
+                contact.prop(c,'pb_ten') = pb_ten*i
+                contact.prop(c,'pb_coh') = pb_coh*i
+                contact.prop(c,'fric') = fric*0.05
+                contact.prop(c,'pb_fa') = pb_fa*0.005
+            endif
+        endloop
+    endloop
+end
+@search_contact
+
+
+[AxialStress = 0.0]
+fish define AxialStress
+    width = 0.15
+    AxialStress = (math.abs(wall.force.contact.y(wall.find(1)))+math.abs(wall.force.contact.y(wall.find(2))))/(2*width) ;  cylinder radius = 1
+end
+fish define AxialStrain
+    length = 0.2
+    AxialStrain = (math.abs(wall.disp.y(wall.find(1)))+math.abs(wall.disp.y(wall.find(2))))/(2*length);  cylinder radius = 1
+end
+
+[nvel=5e-2/1]
+;[specHeight=0.1]
+wall generate id 1 plane position 0.0   0.2
+wall generate id 2 plane position 0.0   0.0
+wall attribute velocity-y [-nvel] range id 1
+wall attribute velocity-y [nvel]  range id 2
+;rblock attribute velocity-y [nvel] gradient 0  [-2.0 * nvel / specHeight]
+
+model cycle 3000
+fish history name '1' @AxialStress
+fish history name '2' @AxialStrain
+
+[stop_me = 0]
+[ucs = 0]
+define stop_me
+    s=AxialStress
+    if s>ucs then
+       ucs=s
+       ucs_strain=AxialStrain
+    else if s<ucs*0.3
+        stop_me=1
+    endif
+end
+model solve fishhalt @stop_me
+model save 'cross angle s-30-60' 
+
+history export '1' vs '2' file 'cross angle s-30-60.csv' 
+

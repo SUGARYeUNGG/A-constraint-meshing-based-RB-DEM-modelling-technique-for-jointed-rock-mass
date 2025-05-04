@@ -1,0 +1,11 @@
+model new
+model large-strain on
+model domain extent -0.25 0.25 condition destroy
+;
+program call "ElemInfo.dat"
+rblock scale relative 1.001
+rblock erode relative 0.002 skip-errors
+
+rblock attribute density 2650 damp 0.7
+rblock property 'fric' 0.2
+model save 'initial'
