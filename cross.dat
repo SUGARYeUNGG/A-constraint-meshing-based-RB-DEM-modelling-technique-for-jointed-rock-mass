@@ -102,7 +102,7 @@ define stop_me
     endif
 end
 model solve fishhalt @stop_me
-model save 'cross angle s-30-60' 
+model save 'cross angle s-60-60' 
 
-history export '1' vs '2' file 'cross angle s-30-60.csv' 
+history export '1' vs '2' file 'cross angle s-60-60.csv' 
 
